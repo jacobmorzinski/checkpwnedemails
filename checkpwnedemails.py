@@ -10,15 +10,15 @@ import json
 import sys
 import traceback
 try:
-        from urllib.parse import quote as urlquote
-        from urllib.request import urlopen
-        from urllib.request import Request
-        from urllib.error import HTTPError
+    from urllib.parse import quote as urlquote
+    from urllib.request import urlopen
+    from urllib.request import Request
+    from urllib.error import HTTPError
 except ImportError:
-        from urllib import quote as urlquote
-        from urllib2 import urlopen
-        from urllib2 import Request
-        from urllib2 import HTTPError
+    from urllib import quote as urlquote
+    from urllib2 import urlopen
+    from urllib2 import Request
+    from urllib2 import HTTPError
 
 PWNED_API_URL = "https://haveibeenpwned.com/api/v2/%s/%s?truncateResponse=true&includeUnverified=true"
 HEADERS = {"User-Agent": "checkpwnedemails"}
@@ -31,174 +31,174 @@ BREACHED = "breachedaccount"
 PASTEBIN = "pasteaccount"
 
 class PwnedArgParser(ArgumentParser):
-        def error(self, message):
-                sys.stderr.write('error: %s\n' %message)
-                self.print_help()
-                sys.exit(2)
+    def error(self, message):
+        sys.stderr.write('error: %s\n' %message)
+        self.print_help()
+        sys.exit(2)
 
 def get_args():
-        parser = PwnedArgParser()
+    parser = PwnedArgParser()
 
-        parser.add_argument('-p', action="store_true", dest='only_pwned', help='Print only the pwned email addresses.')
-        parser.add_argument('-s', dest="single_email", help='Send query for just one email address.')
-        parser.add_argument('-i', dest='input_path',   help='Path to text file that lists email addresses.')
-        parser.add_argument('-o', dest='output_path',  help='Path to output (tab deliminated) text file.')
-        parser.add_argument('-b', action="store_true", dest='only_breaches', help='Return results for breaches only.')
-        parser.add_argument('-t', action="store_true", dest='only_pastebins', help='Return results for pastebins only.')
-        parser.add_argument('-u', action="store_true", dest='include_unverified', help='Returns breaches that have been flagged as "unverified".')
+    parser.add_argument('-p', action="store_true", dest='only_pwned', help='Print only the pwned email addresses.')
+    parser.add_argument('-s', dest="single_email", help='Send query for just one email address.')
+    parser.add_argument('-i', dest='input_path',   help='Path to text file that lists email addresses.')
+    parser.add_argument('-o', dest='output_path',  help='Path to output (tab deliminated) text file.')
+    parser.add_argument('-b', action="store_true", dest='only_breaches', help='Return results for breaches only.')
+    parser.add_argument('-t', action="store_true", dest='only_pastebins', help='Return results for pastebins only.')
+    parser.add_argument('-u', action="store_true", dest='include_unverified', help='Returns breaches that have been flagged as "unverified".')
 
-        if len(sys.argv) == 1:  # If no arguments were provided, then print help and exit.
-                parser.print_help()
-                sys.exit(1)
+    if len(sys.argv) == 1:  # If no arguments were provided, then print help and exit.
+        parser.print_help()
+        sys.exit(1)
 
-        return parser.parse_args()
+    return parser.parse_args()
 
 #  Used for removing the trailing '\n' character on each email.
 def clean_list(list_of_strings):
-        return [str(x).strip() for x in list_of_strings]
+    return [str(x).strip() for x in list_of_strings]
 
 def get_results(email_list, service, opts):
-        results = []  # list of tuples (email adress, been pwned?, json data)
+    results = []  # list of tuples (email adress, been pwned?, json data)
 
-        for email in email_list:
-                email = email.strip()
-                data = []
-                req  = Request(PWNED_API_URL % (urlquote(service), urlquote(email)), headers=HEADERS)
+    for email in email_list:
+        email = email.strip()
+        data = []
+        req  = Request(PWNED_API_URL % (urlquote(service), urlquote(email)), headers=HEADERS)
 
-                try:
-                        response = urlopen(req)  # This is a json object.
-                        try:
-                                charset = response.headers.get_content_charset()
-                                if charset is None:
-                                        charset = "utf-8"
-                        except AttributeError:
-                                charset = "utf-8"
-                        data     = json.loads(response.read())
-                        results.append( (email, True, data) )
+        try:
+            response = urlopen(req)  # This is a json object.
+            try:
+                charset = response.headers.get_content_charset()
+                if charset is None:
+                    charset = "utf-8"
+            except AttributeError:
+                charset = "utf-8"
+            data     = json.loads(response.read())
+            results.append( (email, True, data) )
 
-                except HTTPError as e:
-                        if e.code == 400:
-                                print("%s does not appear to be a valid email address.  HTTP Error 400." % (email))
-                        if e.code == 403:
-                                print("Forbidden - no user agent has been specified in the request.  HTTP Error 403.")
-                        if e.code == 404 and not opts.only_pwned:
-                                results.append( (email, False, data) )
-                        if e.code == 429:
-                                print("Too many requests; going over the request rate limit.  HTTP Error 429.")
+        except HTTPError as e:
+            if e.code == 400:
+                print("%s does not appear to be a valid email address.  HTTP Error 400." % (email))
+            if e.code == 403:
+                print("Forbidden - no user agent has been specified in the request.  HTTP Error 403.")
+            if e.code == 404 and not opts.only_pwned:
+                results.append( (email, False, data) )
+            if e.code == 429:
+                print("Too many requests; going over the request rate limit.  HTTP Error 429.")
 
-                sleep(1.6)  # This 1.6 second delay is for rate limiting.
+        sleep(1.6)  # This 1.6 second delay is for rate limiting.
 
-                if not opts.output_path:
-                        try:
-                                last_result = results[-1]
+        if not opts.output_path:
+            try:
+                last_result = results[-1]
 
-                                if not last_result[PWNEDINDEX]:
-                                        if service == BREACHED:
-                                                print("Email address %s not pwned.  Yay!" % (email))
-                                        else:
-                                                print("Email address %s was not found in any pastes.  Yay!" %(email))
-                                elif data:
-                                        print("\n%s pwned!\n==========" % (email))
-                                        print(json.dumps(data, indent=4))
-                                        print('\n')
+                if not last_result[PWNEDINDEX]:
+                    if service == BREACHED:
+                        print("Email address %s not pwned.  Yay!" % (email))
+                    else:
+                        print("Email address %s was not found in any pastes.  Yay!" %(email))
+                elif data:
+                    print("\n%s pwned!\n==========" % (email))
+                    print(json.dumps(data, indent=4))
+                    print('\n')
 
-                        except IndexError:
-                                pass
+            except IndexError:
+                pass
 
-        return results
+    return results
 
 #  This function will convert every item, in dlist, into a string and
 #  encode any unicode strings into an 8-bit string.
 def clean_and_encode(dlist):
-        cleaned_list = []
+    cleaned_list = []
 
-        for d in dlist:
-                try:
-                        cleaned_list.append(str(d))
-                except UnicodeEncodeError:
-                        cleaned_list.append(str(d.encode('utf-8')))  # Clean the data.
+    for d in dlist:
+        try:
+            cleaned_list.append(str(d))
+        except UnicodeEncodeError:
+            cleaned_list.append(str(d.encode('utf-8')))  # Clean the data.
 
-        return cleaned_list
+    return cleaned_list
 
 def tab_delimited_string(data):
-        DATACLASSES = 'DataClasses'
+    DATACLASSES = 'DataClasses'
 
-        begining_sub_str = data[EMAILINDEX] + '\t' + str(data[PWNEDINDEX])
-        output_list      = []
+    begining_sub_str = data[EMAILINDEX] + '\t' + str(data[PWNEDINDEX])
+    output_list      = []
 
-        if data[DATAINDEX]:
-                for bp in data[DATAINDEX]:  # bp stands for breaches/pastbins
-                        d = bp
-                        
-                        try:
-                                flat_data_classes = [str(x) for x in d[DATACLASSES]]
-                                d[DATACLASSES]    = flat_data_classes
-                        except KeyError:
-                                pass  #  Not processing a string for a breach.
+    if data[DATAINDEX]:
+        for bp in data[DATAINDEX]:  # bp stands for breaches/pastbins
+            d = bp
+            
+            try:
+                flat_data_classes = [str(x) for x in d[DATACLASSES]]
+                d[DATACLASSES]    = flat_data_classes
+            except KeyError:
+                pass  #  Not processing a string for a breach.
 
-                        flat_d = clean_and_encode(d.values())
-                        output_list.append(begining_sub_str + '\t' + "\t".join(flat_d))
-        else:
-                output_list.append(begining_sub_str)
+            flat_d = clean_and_encode(d.values())
+            output_list.append(begining_sub_str + '\t' + "\t".join(flat_d))
+    else:
+        output_list.append(begining_sub_str)
 
-        return '\n'.join(output_list)
+    return '\n'.join(output_list)
 
 def write_results_to_file(filename, results, opts):
-        BREACHESTXT = "_breaches.txt"
-        PASTESTXT   = "_pastes.txt"
-        files = []
+    BREACHESTXT = "_breaches.txt"
+    PASTESTXT   = "_pastes.txt"
+    files = []
 
-        file_headers = {
-                        BREACHESTXT: "Email Address\tIs Pwned\tPwn Count\tDomain\tName\tTitle\tData Classes\tLogo Type\tBreach Date\tAdded Date\tIs Verified\tDescription",
-                        PASTESTXT:   "Email Address\tIs Pwned\tDate\tSource\tEmail Count\tID\tTitle",
-        }
+    file_headers = {
+            BREACHESTXT: "Email Address\tIs Pwned\tPwn Count\tDomain\tName\tTitle\tData Classes\tLogo Type\tBreach Date\tAdded Date\tIs Verified\tDescription",
+            PASTESTXT:   "Email Address\tIs Pwned\tDate\tSource\tEmail Count\tID\tTitle",
+    }
 
-        if opts.only_breaches:
-                files.append(BREACHESTXT)
-        elif opts.only_pastebins:
-                files.append(PASTESTXT)
-        else:
-                files.append(BREACHESTXT)
-                files.append(PASTESTXT)
+    if opts.only_breaches:
+        files.append(BREACHESTXT)
+    elif opts.only_pastebins:
+        files.append(PASTESTXT)
+    else:
+        files.append(BREACHESTXT)
+        files.append(PASTESTXT)
 
-        if filename.rfind('.') > -1:
-                filename = filename[:filename.rfind('.')]
+    if filename.rfind('.') > -1:
+        filename = filename[:filename.rfind('.')]
 
-        for res, f in zip(results, files):
-                outfile = open(filename + f, 'w')
+    for res, f in zip(results, files):
+        outfile = open(filename + f, 'w')
 
-                outfile.write(file_headers[f] + '\n')
+        outfile.write(file_headers[f] + '\n')
 
-                for r in res:
-                        outfile.write(tab_delimited_string(r) + '\n')
+        for r in res:
+            outfile.write(tab_delimited_string(r) + '\n')
 
-                outfile.close()
+        outfile.close()
 
 def main():
-        email_list = []
-        opts = get_args()
+    email_list = []
+    opts = get_args()
 
-        if opts.single_email:
-                email_list = [opts.single_email]
-        else:
-                email_list_file = open(opts.input_path, 'r')
-                email_list      = clean_list(email_list_file.readlines())
+    if opts.single_email:
+        email_list = [opts.single_email]
+    else:
+        email_list_file = open(opts.input_path, 'r')
+        email_list      = clean_list(email_list_file.readlines())
 
-                email_list_file.close()
+        email_list_file.close()
 
-        results = []
+    results = []
 
-        if opts.only_breaches:
-                results.append(get_results(email_list, BREACHED, opts))
-        elif opts.only_pastebins:
-                results.append(get_results(email_list, PASTEBIN, opts))
-        else:
-                results.append(get_results(email_list, BREACHED, opts))
-                results.append(get_results(email_list, PASTEBIN, opts))
+    if opts.only_breaches:
+        results.append(get_results(email_list, BREACHED, opts))
+    elif opts.only_pastebins:
+        results.append(get_results(email_list, PASTEBIN, opts))
+    else:
+        results.append(get_results(email_list, BREACHED, opts))
+        results.append(get_results(email_list, PASTEBIN, opts))
 
-        if opts.output_path:
-                write_results_to_file(opts.output_path, results, opts)
+    if opts.output_path:
+        write_results_to_file(opts.output_path, results, opts)
 
 
 if __name__ == '__main__':
-        main()
+    main()
