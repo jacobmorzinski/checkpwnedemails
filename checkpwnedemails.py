@@ -67,6 +67,12 @@ def get_results(email_list, service, opts):
 
                 try:
                         response = urlopen(req)  # This is a json object.
+                        try:
+                                charset = response.headers.get_content_charset()
+                                if charset is None:
+                                        charset = "utf-8"
+                        except AttributeError:
+                                charset = "utf-8"
                         data     = json.loads(response.read())
                         results.append( (email, True, data) )
 
