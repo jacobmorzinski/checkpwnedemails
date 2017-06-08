@@ -73,7 +73,7 @@ def get_results(email_list, service, opts):
                     charset = "utf-8"
             except AttributeError:
                 charset = "utf-8"
-            data     = json.loads(response.read())
+            data     = json.loads(response.read().decode(charset))
             results.append( (email, True, data) )
 
         except HTTPError as e:
