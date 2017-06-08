@@ -9,8 +9,16 @@ from time     import sleep
 import json
 import sys
 import traceback
-import urllib
-import urllib2
+try:
+        from urllib.parse import quote as urlquote
+        from urllib.request import urlopen
+        from urllib.request import Request
+        from urllib.error import HTTPError
+except ImportError:
+        from urllib import quote as urlquote
+        from urllib2 import urlopen
+        from urllib2 import Request
+        from urllib2 import HTTPError
 
 PWNED_API_URL = "https://haveibeenpwned.com/api/v2/%s/%s"
 HEADERS = {"User-Agent": "checkpwnedemails"}
@@ -54,14 +62,14 @@ def get_results(email_list, service, opts):
         for email in email_list:
                 email = email.strip()
                 data = []
-                req  = urllib2.Request(PWNED_API_URL % (urllib.quote(service), urllib.quote(email)), headers=HEADERS)
+                req  = Request(PWNED_API_URL % (urlquote(service), urlquote(email)), headers=HEADERS)
 
                 try:
-                        response = urllib2.urlopen(req)  # This is a json object.
+                        response = urlopen(req)  # This is a json object.
                         data     = json.loads(response.read())
                         results.append( (email, True, data) )
 
-                except urllib2.HTTPError as e:
+                except HTTPError as e:
                         if e.code == 400:
                                 print("%s does not appear to be a valid email address.  HTTP Error 400." % (email))
                         if e.code == 403:
