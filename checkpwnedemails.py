@@ -20,7 +20,7 @@ except ImportError:
         from urllib2 import Request
         from urllib2 import HTTPError
 
-PWNED_API_URL = "https://haveibeenpwned.com/api/v2/%s/%s"
+PWNED_API_URL = "https://haveibeenpwned.com/api/v2/%s/%s?truncateResponse=true&includeUnverified=true"
 HEADERS = {"User-Agent": "checkpwnedemails"}
 
 EMAILINDEX = 0
@@ -39,12 +39,13 @@ class PwnedArgParser(ArgumentParser):
 def get_args():
         parser = PwnedArgParser()
 
-        parser.add_argument('-b', action="store_true", dest='only_breaches', help='Return results for breaches only.')
-        parser.add_argument('-i', dest='input_path',   help='Path to text file that lists email addresses.')
-        parser.add_argument('-o', dest='output_path',  help='Path to output (tab deliminated) text file.')
         parser.add_argument('-p', action="store_true", dest='only_pwned', help='Print only the pwned email addresses.')
         parser.add_argument('-s', dest="single_email", help='Send query for just one email address.')
+        parser.add_argument('-i', dest='input_path',   help='Path to text file that lists email addresses.')
+        parser.add_argument('-o', dest='output_path',  help='Path to output (tab deliminated) text file.')
+        parser.add_argument('-b', action="store_true", dest='only_breaches', help='Return results for breaches only.')
         parser.add_argument('-t', action="store_true", dest='only_pastebins', help='Return results for pastebins only.')
+        parser.add_argument('-u', action="store_true", dest='include_unverified', help='Returns breaches that have been flagged as "unverified".')
 
         if len(sys.argv) == 1:  # If no arguments were provided, then print help and exit.
                 parser.print_help()
