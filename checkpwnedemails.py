@@ -11,16 +11,20 @@ import sys
 import traceback
 try:
     from urllib.parse import quote as urlquote
+    from urllib.parse import urlencode
+    from urllib.parse import urlparse
     from urllib.request import urlopen
     from urllib.request import Request
     from urllib.error import HTTPError
 except ImportError:
     from urllib import quote as urlquote
+    from urllib import urlencode
+    from urlparse import urlparse
     from urllib2 import urlopen
     from urllib2 import Request
     from urllib2 import HTTPError
 
-PWNED_API_URL = "https://haveibeenpwned.com/api/v2/%s/%s?truncateResponse=true&includeUnverified=true"
+PWNED_API_URL = "https://haveibeenpwned.com/api/v2/%s/%s"
 HEADERS = {"User-Agent": "checkpwnedemails"}
 
 EMAILINDEX = 0
@@ -46,6 +50,7 @@ def get_args():
     parser.add_argument('-b', action="store_true", dest='only_breaches', help='Return results for breaches only.')
     parser.add_argument('-t', action="store_true", dest='only_pastebins', help='Return results for pastebins only.')
     parser.add_argument('-u', action="store_true", dest='include_unverified', help='Returns breaches that have been flagged as "unverified".')
+    parser.add_argument('-n', action="store_true", dest='truncate_response', help='Only breach names, no breach data.')
 
     if len(sys.argv) == 1:  # If no arguments were provided, then print help and exit.
         parser.print_help()
@@ -58,12 +63,20 @@ def clean_list(list_of_strings):
     return [str(x).strip() for x in list_of_strings]
 
 def get_results(email_list, service, opts):
-    results = []  # list of tuples (email adress, been pwned?, json data)
+    results = []  # list of tuples (email address, been pwned?, json data)
+
+    url_parts = urlparse(PWNED_API_URL)
+    query = {}
+    if opts.include_unverified:
+        query.update({'includeUnverified': 'true'})
+    if opts.truncate_response:
+        query.update({'truncateResponse': 'true'})
+    api_url = url_parts._replace(query=urlencode(query)).geturl()
 
     for email in email_list:
         email = email.strip()
         data = []
-        req  = Request(PWNED_API_URL % (urlquote(service), urlquote(email)), headers=HEADERS)
+        req = Request(api_url % (urlquote(service), urlquote(email)), headers=HEADERS)
 
         try:
             response = urlopen(req)  # This is a json object.
@@ -73,8 +86,8 @@ def get_results(email_list, service, opts):
                     charset = "utf-8"
             except AttributeError:
                 charset = "utf-8"
-            data     = json.loads(response.read().decode(charset))
-            results.append( (email, True, data) )
+            data = json.loads(response.read().decode(charset))
+            results.append((email, True, data))
 
         except HTTPError as e:
             if e.code == 400:
@@ -82,7 +95,7 @@ def get_results(email_list, service, opts):
             if e.code == 403:
                 print("Forbidden - no user agent has been specified in the request.  HTTP Error 403.")
             if e.code == 404 and not opts.only_pwned:
-                results.append( (email, False, data) )
+                results.append((email, False, data))
             if e.code == 429:
                 print("Too many requests; going over the request rate limit.  HTTP Error 429.")
 
@@ -129,7 +142,7 @@ def tab_delimited_string(data):
     if data[DATAINDEX]:
         for bp in data[DATAINDEX]:  # bp stands for breaches/pastbins
             d = bp
-            
+
             try:
                 flat_data_classes = [str(x) for x in d[DATACLASSES]]
                 d[DATACLASSES]    = flat_data_classes
